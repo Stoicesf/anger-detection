@@ -1,0 +1,21 @@
+# Demo / realtime inference (conda env: pytorch12 recommended)
+numpy>=1.26
+librosa>=0.10
+soundfile
+onnxruntime>=1.16
+streamlit>=1.33
+sounddevice
+
+# Training / fine-tune (optional)
+# torch  # install matching CUDA build separately
+# scikit-learn
+# pandas
+# pyarrow
+# onnx
+
+# TFLite export / ESP32 path (optional, Windows TF CPU only)
+# tensorflow
+# tf-keras
+# onnx2tf
+# onnx_graphsurgeon
+# ai-edge-litert

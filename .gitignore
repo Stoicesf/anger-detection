@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.env
+.python-version
+
+# Caches / temp
+.numba_cache/
+.cache/
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Local / large data (do not upload)
+data/raw/
+data/processed/*.npy
+data/processed/*.npz
+!data/processed/.gitkeep
+
+# Training artifacts / logs (keep small metrics JSON)
+output/*.log
+output/*_log.txt
+output/*.npz
+output/*_cache.npz
+output/*.png
+output/*.wav
+!output/.gitkeep
+!output/metrics.json
+!output/casia_finetune_metrics.json
+!output/tflite_metrics.json
+!output/history_torch.json
+
+# Heavy / redundant model intermediates
+models/calib_data.npy
+models/tflite_export/
+models/tflite_fp32/
+
+# Streamlit / local runtime
+.streamlit/secrets.toml
+
+# Sample audio (local only)
+test01.mp3
+*.wav
+!demo/.gitkeep
+
+# OS
+desktop.ini

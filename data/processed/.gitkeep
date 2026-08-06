@@ -1,0 +1,4 @@
+# Placeholder — raw/processed audio features are gitignored (too large).
+# Rebuild with:
+#   python scripts/download_chinese_data.py
+#   python scripts/prepare_data_chinese.py

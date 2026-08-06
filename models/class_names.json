@@ -1,0 +1,10 @@
+{
+  "class_names": [
+    "0_中性 (neutral)",
+    "1_高兴 (happy)",
+    "2_愤怒 (angry)",
+    "3_悲伤 (sad)",
+    "4_惊讶 (surprise)"
+  ],
+  "num_classes": 5
+}

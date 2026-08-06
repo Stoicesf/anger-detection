@@ -1,0 +1,21 @@
+# Full training / TFLite export stack (optional)
+# Prefer: conda env pytorch12 with matching CUDA torch
+torch==2.6.0+cu124
+torchaudio==2.6.0+cu124
+torchvision==0.21.0+cu124
+tensorflow==2.21.0
+tf-keras==2.21.0
+librosa==0.11.0
+soundfile
+numpy
+pandas
+pyarrow
+scikit-learn
+onnx
+onnx2tf
+onnx_graphsurgeon
+ai-edge-litert
+simplejson
+streamlit
+sounddevice
+onnxruntime
