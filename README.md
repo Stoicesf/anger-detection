@@ -2,7 +2,15 @@
 
 中文语音**愤怒检测**端到端工程：DS-CNN 训练 / CASIA 微调 / ONNX 部署 / Streamlit 实时 Demo。
 
-**版本：`v0`（基线）** · 迭代请在分支 `v1` 上进行。
+**当前分支：`v1`** · 标签 `v0` 为基线快照 · 版本见 `VERSION`
+
+## 路线图
+
+```
+v0 基线 Demo → Phase1 决策层(EMA/连续触发/状态机) → Phase2 真实数据增强 → Phase3 量化/蒸馏 → Phase4 FastAPI 部署
+```
+
+`v1` **已完成 Phase 1**：把「逐帧阈值」升级为「实时事件检测」。
 
 ## 功能概览
 
@@ -10,7 +18,8 @@
 |------|------|
 | 五类情绪模型 | 中性 / 高兴 / 愤怒 / 悲伤 / 惊讶（ESD 中文训练） |
 | CASIA 微调 | `dscnn_casia_deploy.onnx`，面向公开中文测试集 |
-| 实时 Demo | 默认「非愤怒」，仅愤怒过阈值才报警；麦克风持续监听 |
+| 实时决策层 (v1) | EMA 平滑 + 连续命中 + NORMAL/SUSPECT/ANGER/RECOVER |
+| 实时 Demo | 默认非愤怒；仅进入 ANGER 才报警；麦克风持续监听 |
 | 边缘部署 | int8 TFLite ~28KB，面向 ESP32-S3 |
 
 ## 快速开始（实时 Demo）

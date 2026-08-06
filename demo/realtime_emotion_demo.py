@@ -1,10 +1,10 @@
-"""Realtime anger alarm demo (fine-tuned DS-CNN + ONNX).
+"""Realtime anger alarm demo — Phase 1 decision layer.
 
-Default state = 非愤怒. Supports continuous live mic monitoring.
+EMA + consecutive trigger + NORMAL/SUSPECT/ANGER/RECOVER state machine.
+Default user-facing state is non-anger; alarm only in ANGER.
 
 Run:
   conda activate pytorch12
-  cd "E:\\桌面\\Anger detection"
   streamlit run demo/realtime_emotion_demo.py --server.port 8503
 """
 from __future__ import annotations
@@ -12,7 +12,6 @@ from __future__ import annotations
 import sys
 import tempfile
 import time
-import wave
 from pathlib import Path
 
 import numpy as np
@@ -24,11 +23,18 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(DEMO_DIR))
 
 from common import MODELS_DIR, SR, TIME_FRAMES  # noqa: E402
+from decision import AlarmState, AngerStateMachine, DecisionConfig, STATE_LABEL_ZH  # noqa: E402
 from live_monitor import LiveAngerMonitor, audio_to_temp_wav  # noqa: E402
 from prepare_data import log_mel_full  # noqa: E402
 
 ANGRY_IDX = 2
 LABEL_SHORT = ["中性", "高兴", "愤怒", "悲伤", "惊讶"]
+STATE_COLOR = {
+    "NORMAL": "#2bb673",
+    "SUSPECT": "#e6a700",
+    "ANGER": "#e53935",
+    "RECOVER": "#5b8def",
+}
 
 CANDIDATES = [
     MODELS_DIR / "dscnn_casia_deploy.onnx",
@@ -54,7 +60,7 @@ def pick_model() -> Path:
     for p in CANDIDATES:
         if p.exists():
             return p
-    raise FileNotFoundError("No ONNX model found. Run scripts/finetune_casia.py first.")
+    raise FileNotFoundError("No ONNX model found.")
 
 
 def center_crop(feat: np.ndarray) -> np.ndarray:
@@ -64,9 +70,7 @@ def center_crop(feat: np.ndarray) -> np.ndarray:
         return feat[start : start + TIME_FRAMES]
     pad_before = (TIME_FRAMES - t) // 2
     return np.pad(
-        feat,
-        ((pad_before, TIME_FRAMES - t - pad_before), (0, 0)),
-        mode="edge",
+        feat, ((pad_before, TIME_FRAMES - t - pad_before), (0, 0)), mode="edge"
     )
 
 
@@ -80,44 +84,20 @@ def predict_wav(sess, inp_name: str, wav_path: Path) -> tuple[np.ndarray, float]
 
 def make_predict_fn(sess, inp_name: str):
     def _predict(audio: np.ndarray) -> tuple[np.ndarray, float]:
-        wav = audio_to_temp_wav(audio, SR)
-        return predict_wav(sess, inp_name, wav)
+        return predict_wav(sess, inp_name, audio_to_temp_wav(audio, SR))
 
     return _predict
-
-
-def decide_state(
-    probs: np.ndarray,
-    *,
-    anger_threshold: float,
-    require_argmax: bool,
-    prev_angry: bool,
-    clear_threshold: float,
-) -> tuple[bool, float, str]:
-    anger_p = float(probs[ANGRY_IDX])
-    top = int(np.argmax(probs))
-    if prev_angry:
-        if anger_p >= clear_threshold:
-            return True, anger_p, "保持愤怒（未回落）"
-        return False, anger_p, "愤怒已解除"
-    triggered = anger_p >= anger_threshold
-    if require_argmax:
-        triggered = triggered and top == ANGRY_IDX
-    if triggered:
-        return True, anger_p, "检测到愤怒"
-    return False, anger_p, "常规（非愤怒）"
 
 
 def record_seconds(seconds: float, sr: int = SR) -> np.ndarray:
     import sounddevice as sd
 
-    frames = int(seconds * sr)
-    audio = sd.rec(frames, samplerate=sr, channels=1, dtype="float32")
+    audio = sd.rec(int(seconds * sr), samplerate=sr, channels=1, dtype="float32")
     sd.wait()
     return audio[:, 0]
 
 
-st.set_page_config(page_title="愤怒状态监测", page_icon="◈", layout="wide")
+st.set_page_config(page_title="愤怒事件检测 v1", page_icon="◈", layout="wide")
 st.markdown(
     """
 <style>
@@ -135,7 +115,7 @@ st.markdown(
     border-radius: 18px; padding: 26px 28px;
     background: linear-gradient(145deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
   }
-  .emo-name { font-size: 2.6rem; font-weight: 800; margin: 0.25rem 0; }
+  .emo-name { font-size: 2.4rem; font-weight: 800; margin: 0.25rem 0; }
   .muted { color: #8aa39a !important; font-size: 0.92rem; }
   .pill {
     display:inline-block; padding:4px 12px; border-radius:999px;
@@ -144,11 +124,11 @@ st.markdown(
   .live-dot {
     display:inline-block; width:10px; height:10px; border-radius:50%;
     margin-right:8px; background:#2bb673;
-    box-shadow: 0 0 0 0 rgba(43,182,115,0.7);
     animation: pulse 1.4s infinite;
   }
-  .live-dot.off { background:#666; box-shadow:none; animation:none; }
-  .live-dot.hot { background:#e53935; box-shadow: 0 0 0 0 rgba(229,57,53,0.7); }
+  .live-dot.off { background:#666; animation:none; }
+  .live-dot.hot { background:#e53935; }
+  .live-dot.warn { background:#e6a700; }
   @keyframes pulse {
     0% { box-shadow: 0 0 0 0 rgba(43,182,115,0.55); }
     70% { box-shadow: 0 0 0 12px rgba(43,182,115,0); }
@@ -159,9 +139,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown('<p class="hero">愤怒状态监测</p>', unsafe_allow_html=True)
+st.markdown('<p class="hero">愤怒事件检测 · Phase 1</p>', unsafe_allow_html=True)
 st.markdown(
-    '<p class="sub">默认「非愤怒」· 实时麦克风持续检测 · 仅愤怒过阈值才切换</p>',
+    '<p class="sub">EMA 平滑 · 连续触发 · NORMAL → SUSPECT → ANGER → RECOVER</p>',
     unsafe_allow_html=True,
 )
 
@@ -173,24 +153,23 @@ except FileNotFoundError as e:
 
 sess, inp_name = load_session(str(model_path))
 monitor = get_monitor()
-st.caption(f"模型：`{model_path.name}`")
+st.caption(f"模型：`{model_path.name}` · 分支 v1 / 决策层增强")
 
 with st.sidebar:
-    st.markdown("### 实时检测")
-    window_s = st.slider("分析窗口 (秒)", 1.0, 3.0, 1.5, 0.5)
-    hop_s = st.slider("检测间隔 (秒)", 0.3, 2.0, 0.5, 0.1)
-    anger_threshold = st.slider("触发愤怒阈值", 0.30, 0.95, 0.55, 0.05)
-    clear_threshold = st.slider("解除愤怒阈值", 0.10, 0.80, 0.35, 0.05)
+    st.markdown("### 实时窗口")
+    window_s = st.slider("分析窗口 (秒)", 0.8, 2.5, 1.0, 0.1)
+    hop_s = st.slider("检测间隔 (秒)", 0.25, 1.0, 0.4, 0.05)
+    st.markdown("### 决策层（Phase 1）")
+    ema_alpha = st.slider("EMA α", 0.10, 0.60, 0.30, 0.05)
+    anger_threshold = st.slider("触发阈值", 0.50, 0.90, 0.70, 0.05)
+    clear_threshold = st.slider("解除阈值", 0.10, 0.60, 0.35, 0.05)
+    required_hits = st.slider("连续命中次数", 1, 6, 3, 1)
+    recover_hold_s = st.slider("愤怒后低分维持 (秒)", 1.0, 15.0, 3.0, 0.5)
     require_argmax = st.toggle("愤怒须为最高类", value=True)
-    min_rms = st.slider("最小音量 (RMS)", 0.0, 0.05, 0.005, 0.001)
+    min_rms = st.slider("VAD 最小 RMS", 0.0, 0.05, 0.005, 0.001)
     st.markdown("### 单次检测")
-    seconds = st.slider("单次录音时长 (秒)", 1.0, 5.0, 2.0, 0.5)
-    st.markdown("### 逻辑")
-    st.write(
-        "- 点 **启动实时检测** 后持续听麦\n"
-        "- 常规 = 非愤怒；仅愤怒过阈值报警\n"
-        "- 静音自动回到非愤怒"
-    )
+    seconds = st.slider("单次录音 (秒)", 1.0, 5.0, 2.0, 0.5)
+    st.caption("建议：窗口 1s · 间隔 0.4s · α=0.3 · 阈值 0.70 · 连续 3 次")
 
 monitor.update_config(
     window_s=float(window_s),
@@ -199,19 +178,22 @@ monitor.update_config(
     clear_threshold=float(clear_threshold),
     require_argmax=bool(require_argmax),
     min_rms=float(min_rms),
+    ema_alpha=float(ema_alpha),
+    required_hits=int(required_hits),
+    recover_hold_s=float(recover_hold_s),
     sr=SR,
 )
 
-c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.2, 1.2])
+c1, c2, c3, c4 = st.columns(4)
 start_live = c1.button("▶ 启动实时检测", type="primary")
-stop_live = c2.button("■ 停止实时检测")
-once = c3.button("单次录音检测")
-reset = c4.button("重置为非愤怒")
+stop_live = c2.button("■ 停止")
+once = c3.button("单次录音")
+reset = c4.button("重置状态")
 
 if start_live:
     monitor.start(make_predict_fn(sess, inp_name))
     st.toast("实时检测已启动", icon="🎙️")
-    time.sleep(0.2)
+    time.sleep(0.15)
     st.rerun()
 
 if stop_live:
@@ -220,40 +202,48 @@ if stop_live:
     st.rerun()
 
 if reset:
-    monitor.stop()
-    with monitor._lock:
-        monitor._snap.is_angry = False
-        monitor._snap.anger_p = 0.0
-        monitor._snap.detail = "已手动重置"
-        monitor._snap.probs = None
+    monitor.reset_state()
     st.rerun()
 
 
-@st.fragment(run_every=0.5)
+@st.fragment(run_every=0.4)
 def live_panel():
     snap = monitor.snapshot()
-    is_angry = bool(snap.is_angry)
-    state_name = "愤怒" if is_angry else "非愤怒"
-    state_color = "#e53935" if is_angry else "#2bb673"
-    dot_cls = "live-dot hot" if is_angry else ("live-dot" if snap.running else "live-dot off")
-    status = "LIVE" if snap.running else "IDLE"
+    color = STATE_COLOR.get(snap.state, "#2bb673")
+    if snap.running:
+        if snap.state == "ANGER":
+            dot = "live-dot hot"
+        elif snap.state == "SUSPECT":
+            dot = "live-dot warn"
+        else:
+            dot = "live-dot"
+        status = "LIVE"
+    else:
+        dot = "live-dot off"
+        status = "IDLE"
 
     left, right = st.columns([1.15, 1.0], gap="large")
     with left:
         st.markdown(
             f"""
             <div class="emo-card">
-              <div class="muted"><span class="{dot_cls}"></span>{status}
+              <div class="muted"><span class="{dot}"></span>{status}
+              · {snap.state}
               · 帧 #{snap.frames}
               · RMS {snap.rms:.4f}</div>
-              <div class="emo-name" style="color:{state_color}">{state_name}</div>
-              <div class="muted">{snap.detail}
-              · 愤怒分 {snap.anger_p*100:.1f}%
-              · {snap.lat_ms:.1f} ms</div>
+              <div class="emo-name" style="color:{color}">{snap.state_zh}</div>
+              <div class="muted">{snap.detail}</div>
+              <div class="muted" style="margin-top:6px">
+                平滑分 {snap.anger_p*100:.1f}%
+                · 原始 {snap.raw_anger_p*100:.1f}%
+                · 命中 {snap.hit_count}/{snap.required_hits}
+                · {snap.lat_ms:.1f} ms
+              </div>
               <div style="margin-top:10px">
-                <span class="pill">默认：非愤怒</span>
-                <span class="pill">阈值：{anger_threshold:.0%}</span>
-                <span class="pill">窗口：{window_s:.1f}s / {hop_s:.1f}s</span>
+                <span class="pill">EMA α={ema_alpha:.2f}</span>
+                <span class="pill">阈值 {anger_threshold:.0%}</span>
+                <span class="pill">连续×{required_hits}</span>
+                <span class="pill">{window_s:.1f}s / {hop_s:.2f}s</span>
               </div>
             </div>
             """,
@@ -261,27 +251,29 @@ def live_panel():
         )
         st.progress(
             min(max(snap.anger_p, 0.0), 1.0),
-            text=f"愤怒置信度 {snap.anger_p*100:.1f}%",
+            text=f"EMA 愤怒分 {snap.anger_p*100:.1f}%",
         )
         if snap.error:
             st.warning(snap.error)
         if snap.probs is not None:
-            with st.expander("五类原始概率（调试）"):
+            with st.expander("五类原始概率"):
                 st.bar_chart(
                     {LABEL_SHORT[i]: float(snap.probs[i]) for i in range(5)},
                     horizontal=True,
                 )
 
     with right:
-        st.markdown("#### 事件日志")
-        hist = snap.history
-        if not hist:
-            st.caption("尚无事件。启动实时检测后，状态变化会显示在这里。")
-        for h in hist[:14]:
-            mark = "🔴" if h["angry"] else "🟢"
+        st.markdown("#### 状态事件")
+        if not snap.history:
+            st.caption("启动实时检测后，状态迁移会显示在这里。")
+        for h in snap.history[:16]:
+            icon = {"ANGER": "🔴", "SUSPECT": "🟡", "RECOVER": "🔵"}.get(
+                h.get("state", ""), "🟢"
+            )
             st.write(
-                f"{mark} `{h['t']}`  **{h['label']}**  "
-                f"愤怒分 {h['anger_p']*100:.0f}%  ·  {h['detail']}  ·  {h['lat_ms']:.0f}ms"
+                f"{icon} `{h['t']}` **{h['label']}** "
+                f"EMA {h['anger_p']*100:.0f}% "
+                f"· {h.get('detail','')}"
             )
 
 
@@ -289,7 +281,7 @@ live_panel()
 
 if once:
     if monitor.snapshot().running:
-        st.warning("请先停止实时检测，再使用单次录音（避免抢占麦克风）。")
+        st.warning("请先停止实时检测（避免抢麦）。")
     else:
         with st.spinner(f"录音 {seconds:.1f}s…"):
             try:
@@ -298,39 +290,54 @@ if once:
                 st.error(f"麦克风失败：{e}")
                 st.stop()
         rms = float(np.sqrt((audio**2).mean()))
+        sm = AngerStateMachine(
+            DecisionConfig(
+                ema_alpha=float(ema_alpha),
+                threshold=float(anger_threshold),
+                clear_threshold=float(clear_threshold),
+                required_hits=1,  # single-shot: one frame decision after EMA init
+                require_argmax=bool(require_argmax),
+            )
+        )
         if rms < float(min_rms):
-            st.info("音量过低，判定为非愤怒")
+            st.info("音量过低 → 非愤怒")
         else:
             probs, lat = make_predict_fn(sess, inp_name)(audio)
-            is_angry_now, anger_p, detail = decide_state(
-                probs,
-                anger_threshold=float(anger_threshold),
-                require_argmax=bool(require_argmax),
-                prev_angry=False,
-                clear_threshold=float(clear_threshold),
+            out = sm.update(
+                float(probs[ANGRY_IDX]),
+                top_idx=int(np.argmax(probs)),
+                now=time.time(),
             )
-            if is_angry_now:
-                st.error(f"**愤怒** {anger_p*100:.1f}% · {detail} · {lat*1000:.1f}ms")
+            # For single clip, treat threshold crossing as alarm hint
+            alarm = out.smooth_score > float(anger_threshold) and (
+                (not require_argmax) or int(np.argmax(probs)) == ANGRY_IDX
+            )
+            label = "愤怒" if alarm else "非愤怒"
+            if alarm:
+                st.error(
+                    f"**{label}** EMA {out.smooth_score*100:.1f}% "
+                    f"(raw {out.raw_score*100:.1f}%) · {lat*1000:.1f}ms"
+                )
             else:
-                st.success(f"**非愤怒**（愤怒分 {anger_p*100:.1f}%）· {detail} · {lat*1000:.1f}ms")
+                st.success(
+                    f"**{label}** EMA {out.smooth_score*100:.1f}% "
+                    f"(raw {out.raw_score*100:.1f}%) · {lat*1000:.1f}ms"
+                )
             st.bar_chart(
                 {LABEL_SHORT[i]: float(probs[i]) for i in range(5)}, horizontal=True
             )
 
-uploaded = st.file_uploader("或上传音频测试", type=["wav", "mp3", "flac", "ogg"])
+uploaded = st.file_uploader("上传音频测试", type=["wav", "mp3", "flac", "ogg"])
 if uploaded is not None:
     suffix = Path(uploaded.name).suffix or ".wav"
     tmp = Path(tempfile.gettempdir()) / f"emo_upload{suffix}"
     tmp.write_bytes(uploaded.read())
     probs, lat = predict_wav(sess, inp_name, tmp)
-    is_angry_now, anger_p, detail = decide_state(
-        probs,
-        anger_threshold=float(anger_threshold),
-        require_argmax=bool(require_argmax),
-        prev_angry=False,
-        clear_threshold=float(clear_threshold),
+    raw = float(probs[ANGRY_IDX])
+    alarm = raw > float(anger_threshold) and (
+        (not require_argmax) or int(np.argmax(probs)) == ANGRY_IDX
     )
-    if is_angry_now:
-        st.error(f"文件：**愤怒**（{anger_p*100:.1f}%）· {detail}")
+    if alarm:
+        st.error(f"文件：**愤怒** raw {raw*100:.1f}% · {lat*1000:.1f}ms")
     else:
-        st.success(f"文件：**非愤怒**（愤怒分 {anger_p*100:.1f}%）· {detail}")
+        st.success(f"文件：**非愤怒** raw {raw*100:.1f}% · {lat*1000:.1f}ms")
