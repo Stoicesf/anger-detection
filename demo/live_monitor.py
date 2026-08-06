@@ -27,15 +27,16 @@ from decision import (
 class LiveConfig:
     sr: int = 16000
     window_s: float = 1.0
-    hop_s: float = 0.4
-    anger_threshold: float = 0.70
-    clear_threshold: float = 0.35
+    hop_s: float = 0.35
+    anger_threshold: float = 0.65
+    clear_threshold: float = 0.30
     require_argmax: bool = True
     min_rms: float = 0.005
     ema_alpha: float = 0.30
-    required_hits: int = 3
+    required_hits: int = 2
     recover_hold_s: float = 3.0
     recover_display_s: float = 1.0
+    language: str = "zh-CN"
 
 
 @dataclass

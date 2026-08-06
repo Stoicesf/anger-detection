@@ -29,7 +29,10 @@ data/raw/
 data/processed/*.npy
 data/processed/*.npz
 !data/processed/.gitkeep
-dataset/
+dataset/**/*.wav
+!dataset/**/README.md
+!dataset/**/manifest.json
+!dataset/**/.gitkeep
 
 # Training artifacts / logs (keep small metrics JSON)
 output/*.log
@@ -41,6 +44,8 @@ output/*.wav
 !output/.gitkeep
 !output/metrics.json
 !output/casia_finetune_metrics.json
+!output/hn_finetune_metrics.json
+!output/realtime_metrics_zh.json
 !output/tflite_metrics.json
 !output/history_torch.json
 

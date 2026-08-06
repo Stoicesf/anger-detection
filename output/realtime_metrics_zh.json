@@ -1,0 +1,40 @@
+{
+  "language": "zh-CN",
+  "model": "E:\\桌面\\Anger detection\\models\\dscnn_casia_deploy.onnx",
+  "decision": {
+    "ema_alpha": 0.3,
+    "threshold": 0.65,
+    "required_hits": 2,
+    "window_s": 1.0,
+    "hop_s": 0.35,
+    "recover_hold_s": 3.0
+  },
+  "far_low_arousal": {
+    "duration_h": 0.2,
+    "n_false_alarms": 1,
+    "far_per_hour": 5.0,
+    "pass": false
+  },
+  "far": {
+    "duration_h": 0.2,
+    "n_false_alarms": 1,
+    "far_per_hour": 5.0,
+    "lat_p50_ms": 1.8896000110544264,
+    "target_far_per_hour": 1.0,
+    "pass": false,
+    "note": "includes high-arousal non-anger (happy/surprise) — harder"
+  },
+  "delay": {
+    "n": 200,
+    "misses": 72,
+    "detect_rate": 0.64,
+    "delay_mean_s": 0.4867187499999999,
+    "delay_p50_s": 0.3500000000000001,
+    "delay_p95_s": 1.4,
+    "pass": true
+  },
+  "targets": {
+    "far_per_hour": 1.0,
+    "delay_s": 2.0
+  }
+}

@@ -148,11 +148,13 @@ def stream_decide(
     }
 
 
-def build_long_negative(minutes: float, seed: int = 42) -> np.ndarray:
+def build_long_negative(minutes: float, seed: int = 42, emotions=None) -> np.ndarray:
     """Concatenate Chinese non-angry CASIA clips to ~minutes duration."""
     rng = np.random.default_rng(seed)
+    if emotions is None:
+        emotions = ("neutral", "happy", "sad", "surprise", "fear")
     pools = []
-    for emo in ("neutral", "happy", "sad", "surprise", "fear"):
+    for emo in emotions:
         pools.extend(list_casia(emo))
     rng.shuffle(pools)
     target = int(minutes * 60 * SR)
@@ -162,10 +164,8 @@ def build_long_negative(minutes: float, seed: int = 42) -> np.ndarray:
     while total < target and pools:
         p = pools[i % len(pools)]
         y = load_mono(p)
-        # light gain jitter to simulate real energy variation
         g = float(rng.uniform(0.6, 1.8))
         chunks.append(y * g)
-        # short silence gap
         gap = np.zeros(int(SR * float(rng.uniform(0.15, 0.6))), dtype=np.float32)
         chunks.append(gap)
         total += len(y) + len(gap)
@@ -223,9 +223,17 @@ def main():
         recover_hold_s=args.recover_hold_s,
     )
 
-    print(f"\n[1/2] Building Chinese non-angry stream ~{args.long_negative_minutes} min …")
+    print(f"\n[1/3] FAR on Chinese low-arousal (neutral+sad) ~{args.long_negative_minutes} min …")
+    y_low = build_long_negative(args.long_negative_minutes, emotions=("neutral", "sad"))
+    sm = AngerStateMachine(cfg)
+    far_low = stream_decide(
+        y_low, model, sm, window_s=args.window_s, hop_s=args.hop_s, min_rms=args.min_rms
+    )
+    far_low_h = far_low["n_false_alarms"] / max(far_low["duration_h"], 1e-9)
+    print(f"  FAR_low: {far_low_h:.2f}/hour (alarms={far_low['n_false_alarms']})")
+
+    print(f"\n[2/3] FAR on Chinese hard-negative mix (happy/surprise/fear/neutral) …")
     y_neg = build_long_negative(args.long_negative_minutes)
-    print(f"  samples={len(y_neg)} ({len(y_neg)/SR/60:.1f} min)")
     sm = AngerStateMachine(cfg)
     far = stream_decide(
         y_neg,
@@ -237,14 +245,14 @@ def main():
     )
     far_per_hour = far["n_false_alarms"] / max(far["duration_h"], 1e-9)
     print(
-        f"  FAR: {far['n_false_alarms']} alarms / {far['duration_h']:.3f} h "
+        f"  FAR_hard: {far['n_false_alarms']} alarms / {far['duration_h']:.3f} h "
         f"= {far_per_hour:.2f} /hour"
     )
     print(f"  infer latency p50={far['lat_p50_ms']:.2f} ms")
 
     delay = None
     if not args.skip_delay:
-        print("\n[2/2] Detection delay on CASIA angry (Chinese) …")
+        print("\n[3/3] Detection delay on CASIA angry (Chinese) …")
         delay = eval_detection_delay(
             model, cfg, args.window_s, args.hop_s, args.min_rms
         )
@@ -267,6 +275,12 @@ def main():
             "hop_s": args.hop_s,
             "recover_hold_s": args.recover_hold_s,
         },
+        "far_low_arousal": {
+            "duration_h": far_low["duration_h"],
+            "n_false_alarms": far_low["n_false_alarms"],
+            "far_per_hour": far_low_h,
+            "pass": far_low_h < 1.0,
+        },
         "far": {
             "duration_h": far["duration_h"],
             "n_false_alarms": far["n_false_alarms"],
@@ -274,6 +288,7 @@ def main():
             "lat_p50_ms": far["lat_p50_ms"],
             "target_far_per_hour": 1.0,
             "pass": far_per_hour < 1.0,
+            "note": "includes high-arousal non-anger (happy/surprise) — harder",
         },
         "delay": delay,
         "targets": {"far_per_hour": 1.0, "delay_s": 2.0},

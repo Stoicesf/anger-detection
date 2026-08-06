@@ -156,20 +156,33 @@ monitor = get_monitor()
 st.caption(f"模型：`{model_path.name}` · 分支 v1 / 决策层增强")
 
 with st.sidebar:
+    st.markdown("### 场景预设（中文）")
+    preset = st.radio(
+        "模式",
+        ["低误报", "均衡", "高召回"],
+        index=1,
+        help="仅中文语音。低误报优先 FAR；高召回更容易检出短句愤怒。",
+    )
+    preset_map = {
+        "低误报": dict(thr=0.70, hits=3, alpha=0.30, hop=0.40),
+        "均衡": dict(thr=0.65, hits=2, alpha=0.30, hop=0.35),
+        "高召回": dict(thr=0.55, hits=2, alpha=0.35, hop=0.30),
+    }
+    p = preset_map[preset]
     st.markdown("### 实时窗口")
     window_s = st.slider("分析窗口 (秒)", 0.8, 2.5, 1.0, 0.1)
-    hop_s = st.slider("检测间隔 (秒)", 0.25, 1.0, 0.4, 0.05)
+    hop_s = st.slider("检测间隔 (秒)", 0.25, 1.0, float(p["hop"]), 0.05)
     st.markdown("### 决策层（Phase 1）")
-    ema_alpha = st.slider("EMA α", 0.10, 0.60, 0.30, 0.05)
-    anger_threshold = st.slider("触发阈值", 0.50, 0.90, 0.70, 0.05)
-    clear_threshold = st.slider("解除阈值", 0.10, 0.60, 0.35, 0.05)
-    required_hits = st.slider("连续命中次数", 1, 6, 3, 1)
+    ema_alpha = st.slider("EMA α", 0.10, 0.60, float(p["alpha"]), 0.05)
+    anger_threshold = st.slider("触发阈值", 0.50, 0.90, float(p["thr"]), 0.05)
+    clear_threshold = st.slider("解除阈值", 0.10, 0.60, 0.30, 0.05)
+    required_hits = st.slider("连续命中次数", 1, 6, int(p["hits"]), 1)
     recover_hold_s = st.slider("愤怒后低分维持 (秒)", 1.0, 15.0, 3.0, 0.5)
     require_argmax = st.toggle("愤怒须为最高类", value=True)
     min_rms = st.slider("VAD 最小 RMS", 0.0, 0.05, 0.005, 0.001)
     st.markdown("### 单次检测")
     seconds = st.slider("单次录音 (秒)", 1.0, 5.0, 2.0, 0.5)
-    st.caption("建议：窗口 1s · 间隔 0.4s · α=0.3 · 阈值 0.70 · 连续 3 次")
+    st.caption(f"当前预设：**{preset}** · 仅支持中文语音")
 
 monitor.update_config(
     window_s=float(window_s),

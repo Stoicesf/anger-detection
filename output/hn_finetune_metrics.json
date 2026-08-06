@@ -1,0 +1,16 @@
+{
+  "language": "zh-CN",
+  "phase": 2,
+  "test_speaker": "ZhaoZuoxiang",
+  "test": {
+    "acc5": 0.6620639534883721,
+    "angry_precision": 0.9655172413793104,
+    "angry_recall": 0.7,
+    "angry_f1": 0.8115942028985508,
+    "angry_specificity": 0.9957482993197279,
+    "macro_f1": 0.6568842408694698
+  },
+  "best_score": 0.7711802720706529,
+  "n_rows": 3784,
+  "use_hard_negative": true
+}
