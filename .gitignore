@@ -29,6 +29,7 @@ data/raw/
 data/processed/*.npy
 data/processed/*.npz
 !data/processed/.gitkeep
+dataset/
 
 # Training artifacts / logs (keep small metrics JSON)
 output/*.log
@@ -55,6 +56,11 @@ models/tflite_fp32/
 test01.mp3
 *.wav
 !demo/.gitkeep
+
+# TinyCNN local data (if developed outside baselines/)
+baselines/tinycnn/dataset/
+baselines/tinycnn/exported/
+baselines/tinycnn/**/__pycache__/
 
 # OS
 desktop.ini
