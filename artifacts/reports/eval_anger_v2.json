@@ -1,0 +1,44 @@
+{
+  "onnx": "models\\dscnn_anger_v2.onnx",
+  "classification": {
+    "precision": 0.8995433789954338,
+    "recall": 0.985,
+    "f1": 0.9403341288782816,
+    "auc": 0.9977900000000001,
+    "pr_auc": 0.9889239929087772,
+    "threshold": 0.5,
+    "confusion_matrix": {
+      "labels": [
+        "neg",
+        "pos"
+      ],
+      "matrix": [
+        [
+          978,
+          22
+        ],
+        [
+          3,
+          197
+        ]
+      ]
+    },
+    "n": 1200,
+    "n_pos": 200,
+    "mean_latency_ms": 2.2179398333052327
+  },
+  "realtime": {
+    "detection_rate": 0.31,
+    "mean_delay_s": 0.8024193548387096,
+    "median_delay_s": 0.75,
+    "false_alarms": 0,
+    "neg_hours": 0.10713295138888888,
+    "FAR_per_hour": 0.0,
+    "pos_n": 200,
+    "decision": {
+      "threshold": 0.65,
+      "hits": 4,
+      "ema": 0.25
+    }
+  }
+}

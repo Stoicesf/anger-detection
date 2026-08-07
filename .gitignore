@@ -29,30 +29,39 @@ data/raw/
 data/processed/*.npy
 data/processed/*.npz
 !data/processed/.gitkeep
-dataset/**/*.wav
-!dataset/**/README.md
-!dataset/**/manifest.json
-!dataset/**/.gitkeep
+data/curated/**/*.wav
+!data/curated/**/README.md
+!data/curated/**/manifest.json
+!data/curated/**/.gitkeep
+!data/curated/.gitkeep
 
 # Training artifacts / logs (keep small metrics JSON)
-output/*.log
-output/*_log.txt
-output/*.npz
-output/*_cache.npz
-output/*.png
-output/*.wav
-!output/.gitkeep
-!output/metrics.json
-!output/casia_finetune_metrics.json
-!output/hn_finetune_metrics.json
-!output/realtime_metrics_zh.json
-!output/tflite_metrics.json
-!output/history_torch.json
+artifacts/reports/*.log
+artifacts/reports/*_log.txt
+artifacts/reports/*_console.txt
+artifacts/reports/*.npz
+artifacts/reports/*_cache.npz
+artifacts/reports/*.png
+artifacts/reports/*.wav
+!artifacts/reports/.gitkeep
+!artifacts/reports/metrics.json
+!artifacts/reports/casia_finetune_metrics.json
+!artifacts/reports/hn_finetune_metrics.json
+!artifacts/reports/realtime_metrics_zh.json
+!artifacts/reports/tflite_metrics.json
+!artifacts/reports/history_torch.json
+!artifacts/reports/anger_binary_v2_metrics.json
+!artifacts/reports/eval_anger_v2.json
+!artifacts/reports/eval_anger_v2_grid.json
+!artifacts/reports/eval_anger_v2_grid.md
+!artifacts/reports/confusion_casia_zh.json
+!artifacts/reports/error_cases_zh.json
+!artifacts/reports/decision_grid_zh.json
 
 # Heavy / redundant model intermediates
-models/calib_data.npy
-models/tflite_export/
-models/tflite_fp32/
+artifacts/models/calib_data.npy
+artifacts/models/tflite_export/
+artifacts/models/tflite_fp32/
 
 # Streamlit / local runtime
 .streamlit/secrets.toml
@@ -60,7 +69,7 @@ models/tflite_fp32/
 # Sample audio (local only)
 test01.mp3
 *.wav
-!demo/.gitkeep
+!apps/**/.gitkeep
 
 # TinyCNN local data (if developed outside baselines/)
 baselines/tinycnn/dataset/

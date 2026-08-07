@@ -1,4 +1,10 @@
 # Demo / realtime inference (conda env: pytorch12 recommended)
+#
+# First install the package in editable mode so `import anger_detection` works:
+#   pip install -e .
+# Then:
+#   pip install -r requirements.txt
+
 numpy>=1.26
 librosa>=0.10
 soundfile
@@ -6,7 +12,8 @@ onnxruntime>=1.16
 streamlit>=1.33
 sounddevice
 
-# Training / fine-tune (optional)
+# Training / fine-tune (optional) — prefer: pip install -e ".[train]"
+# or: pip install -r requirements-train.txt
 # torch  # install matching CUDA build separately
 # scikit-learn
 # pandas
